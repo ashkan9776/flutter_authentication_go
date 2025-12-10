@@ -1,13 +1,8 @@
-
 import 'package:flutter_riverpod/legacy.dart';
 
-import 'auth_repository.dart';
+import '../../data/auth_repository.dart';
 
-enum AuthStatus {
-  unknown,
-  authenticated,
-  unauthenticated,
-}
+enum AuthStatus { unknown, authenticated, unauthenticated }
 
 class AuthState {
   final AuthStatus status;
@@ -33,17 +28,17 @@ class AuthState {
   }
 }
 
-class AuthNotifier extends StateNotifier<AuthState> {
+class AuthController extends StateNotifier<AuthState> {
   final AuthRepository _repository;
 
-  AuthNotifier(this._repository) : super(const AuthState()) {
-    _checkLogin();
+  AuthController(this._repository) : super(const AuthState()) {
+    _checkInitialAuth();
   }
 
-  Future<void> _checkLogin() async {
-    final isLoggedIn = await _repository.isLoggedIn();
+  Future<void> _checkInitialAuth() async {
+    final loggedIn = await _repository.isLoggedIn();
     state = state.copyWith(
-      status: isLoggedIn ? AuthStatus.authenticated : AuthStatus.unauthenticated,
+      status: loggedIn ? AuthStatus.authenticated : AuthStatus.unauthenticated,
     );
   }
 
@@ -58,7 +53,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
-        errorMessage: e.toString(),
+        errorMessage: _mapErrorMessage(e),
       );
     }
   }
@@ -71,13 +66,36 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
-        errorMessage: e.toString(),
+        errorMessage: _mapErrorMessage(e),
       );
     }
   }
 
   Future<void> logout() async {
     await _repository.logout();
-    state = state.copyWith(status: AuthStatus.unauthenticated);
+    state = state.copyWith(
+      status: AuthStatus.unauthenticated,
+      errorMessage: null,
+    );
+  }
+
+  String _mapErrorMessage(Object e) {
+    if (e is AuthException) {
+      final text = e.message.toLowerCase();
+      if (text.contains('invalid credentials')) {
+        return 'نام کاربری یا رمز عبور اشتباه است';
+      }
+      if (text.contains('user already exists')) {
+        return 'این نام کاربری قبلاً ثبت شده است';
+      }
+      if (text.contains('not logged in')) {
+        return 'ابتدا وارد حساب کاربری خود شوید';
+      }
+      // پیام خام سرور اگر نخواستی map کنی
+      return e.message;
+    }
+
+    // برای هر ارور غیرمنتظره
+    return 'خطای ناشناخته، کمی بعد دوباره تلاش کنید';
   }
 }
